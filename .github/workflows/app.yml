@@ -117,7 +117,7 @@ jobs:
   # viva y ademas apaga el control para la proxima.
   #
   # Sustituir el paso centinela por la implementacion.
-   secretos:
+  secretos:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
