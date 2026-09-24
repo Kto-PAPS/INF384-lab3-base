@@ -259,12 +259,83 @@ jobs:
   #
   # Sustituir el paso centinela por la implementacion.
   publicar:
+    needs: [calidad, secretos, dependencias, estatico]
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+
+    outputs:
+      digest: ${{ steps.salida.outputs.digest }}
+
+    env:
+      AWS_REGION: us-east-1
+      APLICACION: inf384-lab3
+
     steps:
-      - name: Sin implementar
+      - uses: actions/checkout@v4
+
+      - name: Credenciales temporales
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token:     ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Entrar al registro ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Construir y publicar por SHA
+        env:
+          REGISTRO: ${{ steps.ecr.outputs.registry }}
         run: |
-          echo "::error::El job 'publicar' no esta implementado."
-          exit 1
+          SHA_CORTO="${GITHUB_SHA:0:7}"
+
+          docker build \
+            --platform linux/amd64 \
+            --label "org.opencontainers.image.title=${APLICACION}" \
+            --tag "${REGISTRO}/${APLICACION}:${SHA_CORTO}" \
+            .
+
+          docker push "${REGISTRO}/${APLICACION}:${SHA_CORTO}"
+
+      - name: Promover la misma imagen a prd
+        env:
+          REGISTRO: ${{ steps.ecr.outputs.registry }}
+        run: |
+          SHA_CORTO="${GITHUB_SHA:0:7}"
+
+          docker pull "${REGISTRO}/${APLICACION}:${SHA_CORTO}"
+          docker tag \
+            "${REGISTRO}/${APLICACION}:${SHA_CORTO}" \
+            "${REGISTRO}/${APLICACION}:prd"
+
+          docker push "${REGISTRO}/${APLICACION}:prd"
+
+      - name: Obtener digest publicado
+        id: salida
+        env:
+          REGISTRO: ${{ steps.ecr.outputs.registry }}
+        run: |
+          SHA_CORTO="${GITHUB_SHA:0:7}"
+
+          DIGEST="$(aws ecr describe-images \
+            --repository-name "${APLICACION}" \
+            --image-ids imageTag="${SHA_CORTO}" \
+            --query 'imageDetails[0].imageDigest' \
+            --output text)"
+
+          URI="${REGISTRO}/${APLICACION}@${DIGEST}"
+
+          echo "digest=${URI}" >> "$GITHUB_OUTPUT"
+
+          {
+            echo "### Imagen publicada"
+            echo
+            echo "- Tag inmutable: \`${SHA_CORTO}\`"
+            echo "- Tag de ambiente: \`prd\`"
+            echo "- Digest: \`${URI}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
 
   # Este job viene completo y no se modifica.
   # Las estrategias de despliegue y la verificacion posterior son contenido
