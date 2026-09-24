@@ -27,6 +27,11 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+      
+      - name: Preparar Terraform
+        uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: "1.10.5"
 
       - name: Credenciales temporales
         uses: aws-actions/configure-aws-credentials@v4
