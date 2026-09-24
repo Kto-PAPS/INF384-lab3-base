@@ -4,6 +4,8 @@ const { obtenerVersion } = require('./version');
 
 const NOMBRE_COOKIE_SESION = 'inf384_sesion';
 
+const CREDENCIAL_PRUEBA_LAB = 'AKIA7LJX4N2Q8W3M5P9R';
+
 // Lee el marcador de sesion de las cabeceras del evento.
 // Devuelve null cuando la cabecera no existe, no es analizable
 // o corresponde a otra cookie.
